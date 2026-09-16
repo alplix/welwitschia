@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { ResponsiveContainer, Treemap } from "recharts";
 import type { FolderHeatmapNode } from "@/lib/types";
-import { pluralize } from "@/lib/format";
+import { formatCount, interpolate } from "@/lib/i18n";
+import { useLocale, useTranslations } from "./LanguageProvider";
 import { SectionHeading } from "./EvolutionTimeline";
 
 interface CodebaseHeatmapProps {
@@ -26,6 +27,7 @@ function TreemapCell({ x = 0, y = 0, width = 0, height = 0, name, changes = 0, m
   const ratio = maxChanges > 0 ? changes / maxChanges : 0;
   const opacity = 0.25 + ratio * 0.65;
   const showLabel = width > 46 && height > 26;
+  const clipId = `treemap-clip-${x}-${y}`;
 
   return (
     <g
@@ -46,38 +48,60 @@ function TreemapCell({ x = 0, y = 0, width = 0, height = 0, name, changes = 0, m
         }}
       />
       {showLabel && (
-        <text x={x + 6} y={y + 16} fontSize={11} fill="var(--foreground)" opacity={0.9}>
-          {name && name.length > width / 7 ? `${name.slice(0, Math.floor(width / 7))}…` : name}
-        </text>
+        <>
+          <clipPath id={clipId}>
+            <rect x={x} y={y} width={width} height={height} />
+          </clipPath>
+          <text
+            x={x + 6}
+            y={y + 16}
+            fontSize={11}
+            fill="var(--foreground)"
+            opacity={0.9}
+            clipPath={`url(#${clipId})`}
+          >
+            {name && name.length > width / 7 ? `${name.slice(0, Math.floor(width / 7))}…` : name}
+          </text>
+        </>
       )}
     </g>
   );
 }
 
 export function CodebaseHeatmap({ root }: CodebaseHeatmapProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
   const [hovered, setHovered] = useState<{ name: string; path: string; changes: number } | null>(null);
 
-  const data = useMemo(() => root.children ?? [], [root]);
+  // Render a single flat depth: pass only leaf-level stats (no nested
+  // `children`), otherwise recharts' Treemap recursively lays out and labels
+  // each node's descendants inside it, overlapping this level's own label.
+  const data = useMemo(
+    () =>
+      (root.children ?? []).map((node) => ({
+        name:
+          node.overflowCount !== undefined
+            ? interpolate(t.codebaseHeatmap.otherCount, { count: node.overflowCount })
+            : node.name,
+        path: node.path,
+        changes: node.changes,
+      })),
+    [root, t],
+  );
   const maxChanges = useMemo(() => Math.max(1, ...data.map((d) => d.changes)), [data]);
 
   if (data.length === 0) {
     return (
       <section id="codebase-heatmap" className="animate-fade-in">
-        <SectionHeading
-          title="Codebase Heatmap"
-          description="Which parts of this codebase receive the most development activity?"
-        />
-        <p className="mt-6 text-sm text-muted-dim">No directory-level data was available in the analyzed sample.</p>
+        <SectionHeading title={t.codebaseHeatmap.title} description={t.codebaseHeatmap.description} />
+        <p className="mt-6 text-sm text-muted-dim">{t.codebaseHeatmap.noData}</p>
       </section>
     );
   }
 
   return (
     <section id="codebase-heatmap" className="animate-fade-in">
-      <SectionHeading
-        title="Codebase Heatmap"
-        description="Which parts of this codebase receive the most development activity? Larger, brighter blocks changed more often."
-      />
+      <SectionHeading title={t.codebaseHeatmap.title} description={t.codebaseHeatmap.description} />
 
       <div className="mt-6 rounded-xl border border-border-subtle bg-surface p-4">
         <div style={{ width: "100%", height: 360 }}>
@@ -97,8 +121,8 @@ export function CodebaseHeatmap({ root }: CodebaseHeatmapProps) {
         </div>
         <div className="mt-3 h-5 text-xs text-muted-dim">
           {hovered
-            ? `${hovered.path || hovered.name} — ${hovered.changes.toLocaleString()} ${pluralize(hovered.changes, "change")}`
-            : "Hover a block for details"}
+            ? `${hovered.path || hovered.name} — ${formatCount(locale, hovered.changes, t.units.change)}`
+            : t.codebaseHeatmap.hoverHint}
         </div>
       </div>
     </section>

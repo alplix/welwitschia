@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import type { ContributorEvolutionEntry, ContributorSummary } from "@/lib/types";
-import { pluralize } from "@/lib/format";
+import { formatCount } from "@/lib/i18n";
+import { useLocale, useTranslations } from "./LanguageProvider";
 import { SectionHeading } from "./EvolutionTimeline";
 
 interface ContributorEvolutionProps {
@@ -14,6 +15,8 @@ const DISPLAY_LIMIT = 10;
 const ROW_HEIGHT_PX = 28;
 
 export function ContributorEvolution({ contributors, contributorTotals }: ContributorEvolutionProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
   const avatarByLogin = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of contributorTotals) map.set(c.login, c.avatarUrl);
@@ -37,17 +40,14 @@ export function ContributorEvolution({ contributors, contributorTotals }: Contri
   if (displayed.length === 0) {
     return (
       <section id="contributors" className="animate-fade-in">
-        <SectionHeading title="Contributor Evolution" description="No contributor activity was available to analyze." />
+        <SectionHeading title={t.contributorEvolution.title} description={t.contributorEvolution.noData} />
       </section>
     );
   }
 
   return (
     <section id="contributors" className="animate-fade-in">
-      <SectionHeading
-        title="Contributor Evolution"
-        description="How contributor activity has shifted across the repository's history, based on the analyzed commit sample. Sorted by sampled commit volume, not a ranking of contribution quality."
-      />
+      <SectionHeading title={t.contributorEvolution.title} description={t.contributorEvolution.description} />
 
       <div className="mt-6 overflow-x-auto rounded-xl border border-border-subtle bg-surface p-5 scrollbar-thin">
         <div className="mb-2 flex items-center pl-40 gap-1">
@@ -81,7 +81,7 @@ export function ContributorEvolution({ contributors, contributorTotals }: Contri
                       <div
                         key={year}
                         className="flex h-full w-8 shrink-0 items-end justify-center"
-                        title={`${year}: ${commitCount} ${pluralize(commitCount, "commit")}`}
+                        title={`${year}: ${formatCount(locale, commitCount, t.units.commit)}`}
                       >
                         <div
                           className="w-3 rounded-sm bg-leaf"
@@ -92,7 +92,7 @@ export function ContributorEvolution({ contributors, contributorTotals }: Contri
                   })}
                 </div>
                 <span className="ml-2 shrink-0 text-xs text-muted-dim">
-                  {contributor.totalCommits} {pluralize(contributor.totalCommits, "commit")}
+                  {formatCount(locale, contributor.totalCommits, t.units.commit)}
                 </span>
               </div>
             );

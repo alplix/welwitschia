@@ -1,5 +1,9 @@
+"use client";
+
 import type { TimelinePeriod } from "@/lib/types";
-import { pluralize } from "@/lib/format";
+import { formatCount, interpolate } from "@/lib/i18n";
+import { formatMonthYear } from "@/lib/i18n/date-locales";
+import { useLocale, useTranslations } from "./LanguageProvider";
 import { SectionHeading } from "./EvolutionTimeline";
 
 interface ArchitectureMomentsProps {
@@ -7,15 +11,15 @@ interface ArchitectureMomentsProps {
 }
 
 export function ArchitectureMoments({ periods }: ArchitectureMomentsProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
+
   return (
     <section id="architecture-moments" className="animate-fade-in">
-      <SectionHeading
-        title="Architecture Moments"
-        description="Periods where activity was unusually high compared to the surrounding history, based on a simple rule-based comparison — not a confirmed record of what changed."
-      />
+      <SectionHeading title={t.architectureMoments.title} description={t.architectureMoments.description} />
 
       {periods.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-dim">No unusually active periods were detected in the analyzed sample.</p>
+        <p className="mt-6 text-sm text-muted-dim">{t.architectureMoments.noneDetected}</p>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {periods.map((period) => (
@@ -23,15 +27,15 @@ export function ArchitectureMoments({ periods }: ArchitectureMomentsProps) {
               key={period.key}
               className="rounded-xl border border-border-subtle bg-surface p-4 transition-colors hover:border-accent/40"
             >
-              <p className="text-sm font-medium text-foreground">{period.label}</p>
+              <p className="text-sm font-medium text-foreground">{formatMonthYear(period.key, locale)}</p>
               <p className="mt-1 text-xs text-muted-dim">
-                {period.commitCount} {pluralize(period.commitCount, "commit")} ·{" "}
-                {period.contributorCount} {pluralize(period.contributorCount, "contributor")}
+                {formatCount(locale, period.commitCount, t.units.commit)} ·{" "}
+                {formatCount(locale, period.contributorCount, t.units.contributor)}
               </p>
               <ul className="mt-3 flex flex-col gap-1">
                 {period.signals.map((signal) => (
-                  <li key={signal.label} className="text-xs text-muted">
-                    {signal.detail}
+                  <li key={signal.type} className="text-xs text-muted">
+                    {interpolate(t.signals[signal.type], { percent: signal.percent })}
                   </li>
                 ))}
               </ul>

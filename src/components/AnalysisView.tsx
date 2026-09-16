@@ -12,6 +12,10 @@ import { MostChangedFiles } from "./MostChangedFiles";
 import { CodebaseHeatmap } from "./CodebaseHeatmap";
 import { ContributorEvolution } from "./ContributorEvolution";
 import { FileSurvival } from "./FileSurvival";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { useLocale, useTranslations } from "./LanguageProvider";
+import { formatCount, interpolate } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n";
 import type { ProgressStep, RepositoryAnalysis, StreamEvent } from "@/lib/types";
 
 interface AnalysisViewProps {
@@ -21,12 +25,18 @@ interface AnalysisViewProps {
 
 type Status = "loading" | "error" | "done";
 
+function resolveErrorMessage(t: Dictionary, code: string, fallback: string): string {
+  const codes = t.error.codes as Record<string, string>;
+  return codes[code] ?? fallback;
+}
+
 export function AnalysisView({ owner, repo }: AnalysisViewProps) {
+  const t = useTranslations();
   const [status, setStatus] = useState<Status>("loading");
   const [completedSteps, setCompletedSteps] = useState<ProgressStep[]>([]);
   const [currentStep, setCurrentStep] = useState<ProgressStep | null>(null);
   const [data, setData] = useState<RepositoryAnalysis | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [errorCode, setErrorCode] = useState<string>("");
   const [retryToken, setRetryToken] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -36,7 +46,7 @@ export function AnalysisView({ owner, repo }: AnalysisViewProps) {
       setCompletedSteps([]);
       setCurrentStep(null);
       setData(null);
-      setErrorMessage("");
+      setErrorCode("");
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -47,7 +57,9 @@ export function AnalysisView({ owner, repo }: AnalysisViewProps) {
         });
 
         if (!response.body) {
-          throw new Error("Streaming is not supported in this environment.");
+          setErrorCode("STREAMING_UNSUPPORTED");
+          setStatus("error");
+          return;
         }
 
         const reader = response.body.getReader();
@@ -74,14 +86,14 @@ export function AnalysisView({ owner, repo }: AnalysisViewProps) {
               setData(event.data);
               setStatus("done");
             } else if (event.type === "error") {
-              setErrorMessage(event.message);
+              setErrorCode(event.code);
               setStatus("error");
             }
           }
         }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
-        setErrorMessage("We couldn't reach the analysis service. Check your connection and try again.");
+        setErrorCode("CONNECTION_ERROR");
         setStatus("error");
       }
     },
@@ -107,10 +119,16 @@ export function AnalysisView({ owner, repo }: AnalysisViewProps) {
   }
 
   if (status === "error") {
+    const message =
+      errorCode === "STREAMING_UNSUPPORTED"
+        ? t.error.streamingUnsupported
+        : errorCode === "CONNECTION_ERROR"
+          ? t.error.connectionError
+          : resolveErrorMessage(t, errorCode, t.error.connectionError);
     return (
       <div className="flex flex-1 flex-col">
         <TopBar owner={owner} repo={repo} />
-        <ErrorState message={errorMessage} onRetry={() => setRetryToken((t) => t + 1)} />
+        <ErrorState message={message} onRetry={() => setRetryToken((n) => n + 1)} />
       </div>
     );
   }
@@ -152,13 +170,15 @@ function TopBar({
   onRefresh?: () => void;
   fromCache?: boolean;
 }) {
+  const t = useTranslations();
+
   return (
     <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/85 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="text-sm font-semibold tracking-wide text-foreground">
           WELWITSCHIA
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted sm:inline">
             {owner}/{repo}
           </span>
@@ -167,11 +187,12 @@ function TopBar({
               type="button"
               onClick={onRefresh}
               className="cursor-pointer rounded-lg border border-border-subtle px-3 py-1.5 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground"
-              title={fromCache ? "Loaded from cache — click to re-analyze" : "Re-analyze"}
+              title={fromCache ? t.common.loadedFromCache : t.common.refresh}
             >
-              {fromCache ? "Loaded from cache · Refresh" : "Refresh"}
+              {fromCache ? `${t.common.loadedFromCache} · ${t.common.refresh}` : t.common.refresh}
             </button>
           )}
+          <LanguageSwitcher />
         </div>
       </div>
     </header>
@@ -179,11 +200,22 @@ function TopBar({
 }
 
 function Footer({ meta }: { meta: RepositoryAnalysis["meta"] }) {
+  const t = useTranslations();
+  const { locale } = useLocale();
+
+  const partial = meta.isPartialHistory
+    ? interpolate(t.footer.partialSuffix, { sampled: meta.sampledPageCount, total: meta.totalPageCount })
+    : "";
+
+  const summary = interpolate(t.footer.summary, {
+    count: formatCount(locale, meta.analyzedCommitCount, t.units.commit),
+    partial,
+  });
+
   return (
     <footer className="border-t border-border-subtle px-6 py-8 text-center text-xs text-muted-dim">
-      Analyzed {meta.analyzedCommitCount.toLocaleString()} sampled commits
-      {meta.isPartialHistory ? ` across ${meta.sampledPageCount} of ${meta.totalPageCount} history pages` : ""}.
-      Data reflects a representative sample of repository history, not a complete scan.
+      <p>{summary}</p>
+      <p className="mt-2">{t.common.codedBy}</p>
     </footer>
   );
 }

@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { TimelinePeriod } from "@/lib/types";
-import { pluralize } from "@/lib/format";
+import { formatCount } from "@/lib/i18n";
+import { formatMonthYear } from "@/lib/i18n/date-locales";
+import { useLocale, useTranslations } from "./LanguageProvider";
 import { PeriodDetailPanel } from "./PeriodDetailPanel";
 
 interface EvolutionTimelineProps {
@@ -15,6 +17,8 @@ const BAR_WIDTH_PX = 14;
 const MIN_CHART_WIDTH_PX = 640;
 
 export function EvolutionTimeline({ timeline, repoName }: EvolutionTimelineProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const selectedIndex = useMemo(() => timeline.findIndex((p) => p.key === selectedKey), [timeline, selectedKey]);
@@ -26,20 +30,14 @@ export function EvolutionTimeline({ timeline, repoName }: EvolutionTimelineProps
   if (timeline.length === 0) {
     return (
       <section id="timeline">
-        <SectionHeading
-          title="Evolution Timeline"
-          description="No commit history was available to build a timeline for this repository."
-        />
+        <SectionHeading title={t.timeline.title} description={t.timeline.noData} />
       </section>
     );
   }
 
   return (
     <section id="timeline" className="animate-fade-in">
-      <SectionHeading
-        title="Evolution Timeline"
-        description="Commit activity across the repository's history. Click any period for details — bars marked in amber were flagged as unusually active."
-      />
+      <SectionHeading title={t.timeline.title} description={t.timeline.description} />
 
       <div className="mt-6 overflow-x-auto rounded-xl border border-border-subtle bg-surface p-4 scrollbar-thin">
         <div style={{ width: chartWidth, height: 200 }}>
@@ -62,11 +60,9 @@ export function EvolutionTimeline({ timeline, repoName }: EvolutionTimelineProps
                   const period = payload[0].payload as TimelinePeriod;
                   return (
                     <div className="rounded-lg border border-border-strong bg-surface-elevated px-3 py-2 text-xs shadow-xl">
-                      <p className="font-medium text-foreground">{period.label}</p>
-                      <p className="text-muted">
-                        {period.commitCount} {pluralize(period.commitCount, "commit")}
-                      </p>
-                      {period.isSignificant && <p className="mt-1 text-accent">Significant activity detected</p>}
+                      <p className="font-medium text-foreground">{formatMonthYear(period.key, locale)}</p>
+                      <p className="text-muted">{formatCount(locale, period.commitCount, t.units.commit)}</p>
+                      {period.isSignificant && <p className="mt-1 text-accent">{t.timeline.tooltipSignificant}</p>}
                     </div>
                   );
                 }}

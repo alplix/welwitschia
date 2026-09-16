@@ -46,9 +46,11 @@ export interface ContributorSummary {
   contributions: number;
 }
 
+export type SignalType = "elevated_commits" | "contributor_surge" | "large_churn";
+
 export interface PeriodSignal {
-  label: string;
-  detail: string;
+  type: SignalType;
+  percent: number;
 }
 
 export interface TimelinePeriod {
@@ -97,6 +99,8 @@ export interface FolderHeatmapNode {
   path: string;
   changes: number;
   children?: FolderHeatmapNode[];
+  /** Set only on the synthetic "other" bucket node; the number of items it groups. */
+  overflowCount?: number;
 }
 
 export interface ContributorActivityBucket {

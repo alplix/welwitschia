@@ -170,7 +170,7 @@ describe("buildFolderHeatmap", () => {
     const details = [detail("2024-01-01T00:00:00Z", "alice", files)];
     const root = buildFolderHeatmap(details);
     expect(root.children!.length).toBeLessThanOrEqual(9); // 8 kept + 1 "other"
-    expect(root.children!.some((c) => c.name.startsWith("other"))).toBe(true);
+    expect(root.children!.some((c) => c.overflowCount !== undefined)).toBe(true);
   });
 });
 

@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { format } from "date-fns";
 import type { TimelinePeriod } from "@/lib/types";
-import { pluralize } from "@/lib/format";
+import { formatCount } from "@/lib/i18n";
+import { DATE_FNS_LOCALES, formatMonthYear } from "@/lib/i18n/date-locales";
+import { useLocale, useTranslations } from "./LanguageProvider";
 import { SectionHeading } from "./EvolutionTimeline";
 
 interface ActivityHeatmapProps {
   timeline: TimelinePeriod[];
 }
-
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function intensityColor(ratio: number): string {
   if (ratio <= 0) return "var(--surface-hover)";
@@ -21,7 +22,14 @@ function intensityColor(ratio: number): string {
 }
 
 export function ActivityHeatmap({ timeline }: ActivityHeatmapProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
   const [hovered, setHovered] = useState<TimelinePeriod | null>(null);
+
+  const monthLabels = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => format(new Date(Date.UTC(2024, i, 1)), "MMM", { locale: DATE_FNS_LOCALES[locale] })),
+    [locale],
+  );
 
   const { years, byYearMonth, maxCommits } = useMemo(() => {
     const map = new Map<string, TimelinePeriod>();
@@ -38,15 +46,12 @@ export function ActivityHeatmap({ timeline }: ActivityHeatmapProps) {
 
   return (
     <section id="heatmap" className="animate-fade-in">
-      <SectionHeading
-        title="Activity Heatmap"
-        description="A month-by-month view of development intensity — quiet stretches versus development bursts."
-      />
+      <SectionHeading title={t.heatmap.title} description={t.heatmap.description} />
 
       <div className="mt-6 overflow-x-auto rounded-xl border border-border-subtle bg-surface p-5 scrollbar-thin">
         <div className="inline-flex flex-col gap-1.5">
           <div className="ml-12 flex gap-1.5">
-            {MONTH_LABELS.map((m) => (
+            {monthLabels.map((m) => (
               <div key={m} className="w-6 text-center text-[10px] text-muted-dim">
                 {m}
               </div>
@@ -55,7 +60,7 @@ export function ActivityHeatmap({ timeline }: ActivityHeatmapProps) {
           {years.map((year) => (
             <div key={year} className="flex items-center gap-1.5">
               <div className="w-10 shrink-0 text-right text-[11px] text-muted-dim">{year}</div>
-              {MONTH_LABELS.map((_, monthIdx) => {
+              {monthLabels.map((_, monthIdx) => {
                 const key = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
                 const period = byYearMonth.get(key);
                 const ratio = period && maxCommits > 0 ? period.commitCount / maxCommits : 0;
@@ -80,15 +85,15 @@ export function ActivityHeatmap({ timeline }: ActivityHeatmapProps) {
       <div className="mt-3 flex items-center justify-between text-xs text-muted-dim">
         <span>
           {hovered
-            ? `${hovered.label} — ${hovered.commitCount} ${pluralize(hovered.commitCount, "commit")}`
-            : "Hover a cell for details"}
+            ? `${formatMonthYear(hovered.key, locale)} — ${formatCount(locale, hovered.commitCount, t.units.commit)}`
+            : t.heatmap.hoverHint}
         </span>
         <div className="flex items-center gap-1.5">
-          <span>Quiet</span>
+          <span>{t.heatmap.quiet}</span>
           {[0, 0.1, 0.3, 0.6, 1].map((r) => (
             <span key={r} className="h-3 w-3 rounded-[3px]" style={{ backgroundColor: intensityColor(r) }} />
           ))}
-          <span>Intense</span>
+          <span>{t.heatmap.intense}</span>
         </div>
       </div>
     </section>

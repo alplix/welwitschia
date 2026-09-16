@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { parseGitHubRepoUrl } from "@/lib/validation";
+import { useTranslations } from "./LanguageProvider";
 
 const EXAMPLE_REPOS = ["vercel/next.js", "facebook/react", "microsoft/vscode"];
 
 export function RepoUrlForm() {
   const router = useRouter();
+  const t = useTranslations();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +19,7 @@ export function RepoUrlForm() {
       setError(null);
       router.push(`/r/${owner}/${repo}`);
     } catch {
-      setError("Enter a valid public GitHub repository URL, e.g. https://github.com/vercel/next.js");
+      setError(t.landing.invalidUrl);
     }
   }
 
@@ -34,7 +36,7 @@ export function RepoUrlForm() {
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="https://github.com/vercel/next.js"
+            placeholder={t.landing.inputPlaceholder}
             spellCheck={false}
             autoComplete="off"
             className="w-full rounded-xl border border-border-strong bg-surface px-5 py-4 text-base text-foreground placeholder:text-muted-dim outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent"
@@ -44,14 +46,14 @@ export function RepoUrlForm() {
           type="submit"
           className="cursor-pointer whitespace-nowrap rounded-xl bg-accent px-6 py-4 text-base font-medium text-background transition-colors hover:bg-accent-strong"
         >
-          Analyze Repository
+          {t.landing.analyzeButton}
         </button>
       </form>
 
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
       <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-dim">
-        <span>Try:</span>
+        <span>{t.landing.tryLabel}</span>
         {EXAMPLE_REPOS.map((repo) => (
           <button
             key={repo}
@@ -64,7 +66,7 @@ export function RepoUrlForm() {
         ))}
       </div>
 
-      <p className="mt-6 text-sm text-muted-dim">Currently supports public GitHub repositories.</p>
+      <p className="mt-6 text-sm text-muted-dim">{t.landing.supportNote}</p>
     </div>
   );
 }

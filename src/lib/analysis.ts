@@ -168,10 +168,7 @@ export function detectSignificantPeriods(periods: TimelinePeriod[]): TimelinePer
       period.commitCount >= commitBaseline * SIGNIFICANCE_RATIO
     ) {
       const pct = Math.round(((period.commitCount - commitBaseline) / commitBaseline) * 100);
-      signals.push({
-        label: "Elevated commit volume",
-        detail: `Commit activity was about ${pct}% above the recent average.`,
-      });
+      signals.push({ type: "elevated_commits", percent: pct });
     }
 
     if (
@@ -180,10 +177,7 @@ export function detectSignificantPeriods(periods: TimelinePeriod[]): TimelinePer
       period.contributorCount >= contributorBaseline * SIGNIFICANCE_RATIO
     ) {
       const pct = Math.round(((period.contributorCount - contributorBaseline) / contributorBaseline) * 100);
-      signals.push({
-        label: "Contributor surge",
-        detail: `The number of active contributors rose about ${pct}% versus the recent average.`,
-      });
+      signals.push({ type: "contributor_surge", percent: pct });
     }
 
     if (period.additions + period.deletions > 0) {
@@ -195,10 +189,7 @@ export function detectSignificantPeriods(periods: TimelinePeriod[]): TimelinePer
       const changeBaseline = average(recentChangeVolumes);
       if (changeBaseline !== null && changeVolume >= changeBaseline * SIGNIFICANCE_RATIO && changeVolume >= 200) {
         const pct = Math.round(((changeVolume - changeBaseline) / changeBaseline) * 100);
-        signals.push({
-          label: "Large code churn",
-          detail: `Lines added and removed were about ${pct}% above the recent average.`,
-        });
+        signals.push({ type: "large_churn", percent: pct });
       }
     }
 
@@ -301,7 +292,12 @@ function toHeatmapNode(node: TrieNode, name: string, parentPath: string): Folder
 
   if (overflow.length > 0) {
     const overflowChanges = overflow.reduce((sum, [, n]) => sum + n.changes, 0);
-    children.push({ name: `other (${overflow.length})`, path: `${selfPath}/other`, changes: overflowChanges });
+    children.push({
+      name: "",
+      path: `${selfPath}/other`,
+      changes: overflowChanges,
+      overflowCount: overflow.length,
+    });
   }
 
   return { name, path: selfPath, changes: node.changes, children };

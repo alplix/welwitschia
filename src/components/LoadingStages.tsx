@@ -1,7 +1,15 @@
 "use client";
 
-import { PROGRESS_STEPS } from "@/lib/progress-steps";
 import type { ProgressStep } from "@/lib/types";
+import { useTranslations } from "./LanguageProvider";
+
+const STEP_ORDER: ProgressStep[] = [
+  "fetching_repo",
+  "analyzing_commits",
+  "analyzing_contributors",
+  "building_timeline",
+  "preparing_visualization",
+];
 
 interface LoadingStagesProps {
   completedSteps: ProgressStep[];
@@ -9,12 +17,14 @@ interface LoadingStagesProps {
 }
 
 export function LoadingStages({ completedSteps, currentStep }: LoadingStagesProps) {
+  const t = useTranslations();
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-24">
       <div className="w-full max-w-sm">
-        <p className="mb-8 text-center text-sm tracking-wide text-muted-dim">Analyzing repository</p>
+        <p className="mb-8 text-center text-sm tracking-wide text-muted-dim">{t.loading.heading}</p>
         <ul className="flex flex-col gap-4">
-          {PROGRESS_STEPS.map(({ step, label }) => {
+          {STEP_ORDER.map((step) => {
             const isDone = completedSteps.includes(step);
             const isActive = currentStep === step;
             return (
@@ -35,7 +45,7 @@ export function LoadingStages({ completedSteps, currentStep }: LoadingStagesProp
                     isDone ? "text-muted" : isActive ? "text-foreground" : "text-muted-dim"
                   }`}
                 >
-                  {label}
+                  {t.loading.steps[step]}
                 </span>
               </li>
             );

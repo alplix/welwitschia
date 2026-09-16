@@ -1,5 +1,10 @@
+"use client";
+
 import { format } from "date-fns";
 import type { AnalysisMeta, RepoOverview } from "@/lib/types";
+import { DATE_FNS_LOCALES } from "@/lib/i18n/date-locales";
+import { interpolate } from "@/lib/i18n";
+import { useLocale, useTranslations } from "./LanguageProvider";
 
 interface RepoOverviewCardsProps {
   overview: RepoOverview;
@@ -7,22 +12,21 @@ interface RepoOverviewCardsProps {
   contributorCount: number;
 }
 
-function formatCompactDate(iso: string): string {
-  return format(new Date(iso), "MMM yyyy");
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("en-US");
-}
-
 export function RepoOverviewCards({ overview, meta, contributorCount }: RepoOverviewCardsProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
+  const dateLocale = DATE_FNS_LOCALES[locale];
+
+  const formatCompactDate = (iso: string) => format(new Date(iso), "MMM yyyy", { locale: dateLocale });
+  const formatNumber = (n: number) => n.toLocaleString(locale);
+
   const stats = [
-    { label: "Stars", value: formatNumber(overview.stars) },
-    { label: "Forks", value: formatNumber(overview.forks) },
-    { label: "Contributors", value: formatNumber(contributorCount) },
-    { label: "Analyzed commits", value: formatNumber(meta.analyzedCommitCount) },
-    { label: "Analyzed files", value: formatNumber(meta.analyzedFileCount) },
-    { label: "Created", value: formatCompactDate(overview.createdAt) },
+    { label: t.overview.stars, value: formatNumber(overview.stars) },
+    { label: t.overview.forks, value: formatNumber(overview.forks) },
+    { label: t.overview.contributors, value: formatNumber(contributorCount) },
+    { label: t.overview.analyzedCommits, value: formatNumber(meta.analyzedCommitCount) },
+    { label: t.overview.analyzedFiles, value: formatNumber(meta.analyzedFileCount) },
+    { label: t.overview.created, value: formatCompactDate(overview.createdAt) },
   ];
 
   return (
@@ -42,7 +46,7 @@ export function RepoOverviewCards({ overview, meta, contributorCount }: RepoOver
           rel="noopener noreferrer"
           className="text-sm text-accent hover:text-accent-strong"
         >
-          View on GitHub →
+          {t.common.viewOnGithub} →
         </a>
       </div>
 
@@ -53,8 +57,8 @@ export function RepoOverviewCards({ overview, meta, contributorCount }: RepoOver
             {overview.primaryLanguage}
           </span>
         )}
-        <span>Default branch: {overview.defaultBranch}</span>
-        <span>Last updated {formatCompactDate(overview.updatedAt)}</span>
+        <span>{interpolate(t.overview.defaultBranch, { branch: overview.defaultBranch })}</span>
+        <span>{interpolate(t.overview.lastUpdated, { date: formatCompactDate(overview.updatedAt) })}</span>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

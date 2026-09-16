@@ -9,7 +9,13 @@ import type { RepositoryAnalysis } from "./types";
 const CACHE_DIR = path.join(process.cwd(), ".cache", "repositories");
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+// Bump this whenever RepositoryAnalysis's shape changes, so stale cache
+// entries written by an older version of the code are treated as a miss
+// instead of being returned (and potentially crashing the UI) as-is.
+const CACHE_SCHEMA_VERSION = 2;
+
 interface CacheEnvelope {
+  schemaVersion: number;
   cachedAt: string;
   analysis: RepositoryAnalysis;
 }
@@ -26,6 +32,7 @@ export async function readCachedAnalysis(owner: string, repo: string): Promise<R
   try {
     const raw = await readFile(cacheFilePath(owner, repo), "utf-8");
     const envelope = JSON.parse(raw) as CacheEnvelope;
+    if (envelope.schemaVersion !== CACHE_SCHEMA_VERSION) return null;
     const age = Date.now() - new Date(envelope.cachedAt).getTime();
     if (age > CACHE_TTL_MS) return null;
     return envelope.analysis;
@@ -37,7 +44,11 @@ export async function readCachedAnalysis(owner: string, repo: string): Promise<R
 export async function writeCachedAnalysis(owner: string, repo: string, analysis: RepositoryAnalysis): Promise<void> {
   try {
     await mkdir(CACHE_DIR, { recursive: true });
-    const envelope: CacheEnvelope = { cachedAt: new Date().toISOString(), analysis };
+    const envelope: CacheEnvelope = {
+      schemaVersion: CACHE_SCHEMA_VERSION,
+      cachedAt: new Date().toISOString(),
+      analysis,
+    };
     await writeFile(cacheFilePath(owner, repo), JSON.stringify(envelope), "utf-8");
   } catch {
     // Caching is a best-effort optimization; failures shouldn't break analysis.

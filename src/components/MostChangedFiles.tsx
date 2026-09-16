@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import type { MostChangedFile } from "@/lib/types";
-import { pluralize } from "@/lib/format";
+import { formatCount } from "@/lib/i18n";
+import { DATE_FNS_LOCALES } from "@/lib/i18n/date-locales";
+import { useLocale, useTranslations } from "./LanguageProvider";
 import { SectionHeading } from "./EvolutionTimeline";
 
 interface MostChangedFilesProps {
@@ -11,18 +13,18 @@ interface MostChangedFilesProps {
 }
 
 export function MostChangedFiles({ files }: MostChangedFilesProps) {
+  const t = useTranslations();
+  const { locale } = useLocale();
+  const dateLocale = DATE_FNS_LOCALES[locale];
   const [expandedPath, setExpandedPath] = useState<string | null>(null);
   const maxChanges = files[0]?.changeCount ?? 1;
 
   return (
     <section id="most-changed-files" className="animate-fade-in">
-      <SectionHeading
-        title="Most Changed Files"
-        description="Files touched most often across the analyzed commit sample. Select a file for more detail."
-      />
+      <SectionHeading title={t.mostChangedFiles.title} description={t.mostChangedFiles.description} />
 
       {files.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-dim">No file-level data was available in the analyzed sample.</p>
+        <p className="mt-6 text-sm text-muted-dim">{t.mostChangedFiles.noData}</p>
       ) : (
         <ol className="mt-6 flex flex-col divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface">
           {files.map((file, index) => {
@@ -45,15 +47,21 @@ export function MostChangedFiles({ files }: MostChangedFilesProps) {
                     </div>
                   </div>
                   <span className="w-24 shrink-0 text-right text-sm text-muted">
-                    {file.changeCount.toLocaleString()} {pluralize(file.changeCount, "change")}
+                    {formatCount(locale, file.changeCount, t.units.change)}
                   </span>
                 </button>
                 {isExpanded && (
                   <div className="animate-fade-in grid grid-cols-2 gap-4 border-t border-border-subtle bg-background/40 px-4 py-4 sm:grid-cols-4">
-                    <Detail label="Change count" value={file.changeCount.toLocaleString()} />
-                    <Detail label="Contributors" value={file.contributorCount.toLocaleString()} />
-                    <Detail label="First observed" value={format(new Date(file.firstObservedAt), "MMM yyyy")} />
-                    <Detail label="Last observed" value={format(new Date(file.lastObservedAt), "MMM yyyy")} />
+                    <Detail label={t.fileSurvival.changes} value={file.changeCount.toLocaleString(locale)} />
+                    <Detail label={t.mostChangedFiles.contributors} value={file.contributorCount.toLocaleString(locale)} />
+                    <Detail
+                      label={t.mostChangedFiles.firstObserved}
+                      value={format(new Date(file.firstObservedAt), "MMM yyyy", { locale: dateLocale })}
+                    />
+                    <Detail
+                      label={t.mostChangedFiles.lastObserved}
+                      value={format(new Date(file.lastObservedAt), "MMM yyyy", { locale: dateLocale })}
+                    />
                   </div>
                 )}
               </li>

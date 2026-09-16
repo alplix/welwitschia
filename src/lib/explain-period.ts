@@ -1,7 +1,10 @@
 import { z } from "zod";
+import { LOCALE_CODES } from "./i18n/types";
+import { LOCALE_INFO } from "./i18n/locales";
 
 export const ExplainPeriodRequestSchema = z.object({
   repoName: z.string().min(1).max(200),
+  locale: z.enum(LOCALE_CODES).default("en"),
   periodLabel: z.string().min(1).max(60),
   commitCount: z.number().int().min(0),
   contributorCount: z.number().int().min(0),
@@ -38,6 +41,8 @@ export async function explainPeriod(input: ExplainPeriodRequest): Promise<string
     detected_signals: input.signals,
   };
 
+  const targetLanguage = LOCALE_INFO[input.locale].englishName;
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
 
@@ -54,7 +59,7 @@ export async function explainPeriod(input: ExplainPeriodRequest): Promise<string
         model: ANTHROPIC_MODEL,
         max_tokens: 300,
         system:
-          "You explain software repository activity data to developers. You will be given a small JSON summary of statistics for one time period of a GitHub repository. Write a short, plain-English explanation (2-4 sentences) of what the data shows about that period. Only describe what is present in the data. Do not invent events, causes, or details that are not in the JSON. Do not claim certainty about *why* something happened, only describe *what* the numbers show. Respond in English only, with no preamble.",
+          `You explain software repository activity data to developers. You will be given a small JSON summary of statistics for one time period of a GitHub repository. Write a short, plain-language explanation (2-4 sentences) of what the data shows about that period. Only describe what is present in the data. Do not invent events, causes, or details that are not in the JSON. Do not claim certainty about *why* something happened, only describe *what* the numbers show. Respond in ${targetLanguage} only, with no preamble.`,
         messages: [
           {
             role: "user",
