@@ -62,7 +62,7 @@ It is not a clone of GitHub's own repository statistics. It's a focused, visual 
 - **Codebase Heatmap** — a treemap of which directories receive the most development activity.
 - **Contributor Evolution** — how contributor activity has shifted year over year, based on sampled commit data. Purely descriptive — not a ranking of contribution quality.
 - **File Survival** — files observed as active across the longest stretch of the analyzed sample, as a proxy for long-lived, foundational code.
-- **Explain This Period (optional)** — sends a small summarized JSON payload for one period (counts and top paths, never source code) to the Anthropic API for a plain-English explanation, in whichever language the UI is currently set to. The rest of the app works fully without this configured.
+- **Explain This Period (optional)** — sends a small summarized JSON payload for one period (counts and top paths, never source code) to Tilvar, a self-hosted chat model, for a plain-English explanation, in whichever language the UI is currently set to. The rest of the app works fully without this configured.
 - **Multi-language interface** — the full UI, including number/date formatting and the AI explanation, is available in 20 languages (see [Internationalization](#internationalization)).
 
 ## How it works
@@ -98,7 +98,7 @@ The entire interface is available in **20 languages**: English, German, French, 
 - [Zod](https://zod.dev/) for request validation
 - [Vitest](https://vitest.dev/) for unit tests
 - GitHub REST API (no SDK — plain `fetch`)
-- Anthropic API (optional, for the "Explain This Period" feature — plain `fetch`, no SDK)
+- Tilvar (optional, self-hosted chat API, for the "Explain This Period" feature — plain `fetch`, no SDK)
 
 No database. A simple JSON-file cache is used instead (see [Caching](#caching)).
 
@@ -124,7 +124,8 @@ cp .env.example .env.local
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `GITHUB_TOKEN` | Optional, recommended | Raises the GitHub API rate limit and sampling depth. No scopes needed for public repos. |
-| `ANTHROPIC_API_KEY` | Optional | Enables the "Explain This Period" button. Everything else works without it. |
+| `WELWITSCHIA_TILVAR_API_KEY` | Optional | Enables the "Explain This Period" button. Everything else works without it. |
+| `WELWITSCHIA_TILVAR_API_MAX_CHARS` | Optional | The known request-size limit Tilvar enforces (HTTP 413 above it). Defaults to 5000. |
 
 `.env.local` is git-ignored. Never commit real tokens.
 
@@ -167,7 +168,7 @@ src/
     cache.ts                         Simple file-based cache
     validation.ts                    GitHub URL parsing/validation
     errors.ts                        Typed application errors -> friendly messages
-    explain-period.ts                Anthropic API call for period explanations
+    explain-period.ts                Tilvar API call for period explanations
     i18n/
       types.ts                       Locale list + the Dictionary type every language must satisfy
       locales.ts                     Native/English display names per locale
@@ -189,8 +190,8 @@ Analysis results are cached to a JSON file per repository under `.cache/reposito
 ### Security
 
 - Only `github.com` URLs are accepted; there is no arbitrary URL fetching (see `src/lib/validation.ts`).
-- All GitHub/Anthropic API calls happen server-side; tokens are never sent to the browser.
-- The optional AI explanation endpoint validates its request body with Zod and only ever sends a small summarized JSON payload (counts, top paths) to the Anthropic API — never source code or raw commit data.
+- All GitHub/Tilvar API calls happen server-side; tokens are never sent to the browser.
+- The optional AI explanation endpoint validates its request body with Zod and only ever sends a small summarized JSON payload (counts, top paths) to the Tilvar API — never source code or raw commit data.
 - Secrets are read from environment variables only, never hard-coded, and `.env*` is git-ignored (`.env.example` is explicitly allow-listed since it holds no secrets).
 
 ## Limitations

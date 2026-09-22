@@ -19,12 +19,45 @@ export const ExplainPeriodRequestSchema = z.object({
 
 export type ExplainPeriodRequest = z.infer<typeof ExplainPeriodRequestSchema>;
 
-const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const TILVAR_API_URL = "https://tilvar.athena.org.tr/api/chat";
+const REQUEST_TIMEOUT_MS = 20_000;
+
+interface TilvarChatResponse {
+  reply: string;
+  kind: string;
+}
+
+interface TilvarErrorBody {
+  detail?: string;
+}
+
+async function callTilvar(content: string, apiKey: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(TILVAR_API_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        messages: [{ role: "user", content }],
+        web: false,
+        think: false,
+      }),
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export async function explainPeriod(input: ExplainPeriodRequest): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.WELWITSCHIA_TILVAR_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not configured");
+    throw new Error("WELWITSCHIA_TILVAR_API_KEY is not configured");
   }
 
   const summary = {
@@ -43,43 +76,36 @@ export async function explainPeriod(input: ExplainPeriodRequest): Promise<string
 
   const targetLanguage = LOCALE_INFO[input.locale].englishName;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const systemPrompt = `You explain software repository activity data to developers. You will be given a small JSON summary of statistics for one time period of a GitHub repository. Write a short, plain-language explanation (2-4 sentences) of what the data shows about that period. Only describe what is present in the data. Do not invent events, causes, or details that are not in the JSON. Do not claim certainty about *why* something happened, only describe *what* the numbers show. Respond in ${targetLanguage} only, with no preamble.`;
+  const userContent = `Here is the period data:\n\n${JSON.stringify(summary, null, 2)}`;
 
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 300,
-        system:
-          `You explain software repository activity data to developers. You will be given a small JSON summary of statistics for one time period of a GitHub repository. Write a short, plain-language explanation (2-4 sentences) of what the data shows about that period. Only describe what is present in the data. Do not invent events, causes, or details that are not in the JSON. Do not claim certainty about *why* something happened, only describe *what* the numbers show. Respond in ${targetLanguage} only, with no preamble.`,
-        messages: [
-          {
-            role: "user",
-            content: `Here is the period data:\n\n${JSON.stringify(summary, null, 2)}`,
-          },
-        ],
-      }),
-    });
+  // Tilvar's /api/chat endpoint has no separate `system` field, so the system
+  // instructions and the user content are combined into a single message.
+  const content = `${systemPrompt}\n\n${userContent}`;
 
-    if (!response.ok) {
-      throw new Error(`Anthropic API returned ${response.status}`);
-    }
+  let response = await callTilvar(content, apiKey);
 
-    const data = (await response.json()) as { content?: { type: string; text?: string }[] };
-    const text = data.content?.find((block) => block.type === "text")?.text;
-    if (!text) {
-      throw new Error("Anthropic API returned no text content");
-    }
-    return text.trim();
-  } finally {
-    clearTimeout(timeout);
+  if (response.status === 429) {
+    const retryAfterSeconds = Number(response.headers.get("Retry-After"));
+    const waitMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : 0;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    response = await callTilvar(content, apiKey);
   }
+
+  if (!response.ok) {
+    let detail: string | undefined;
+    try {
+      const errorBody = (await response.json()) as TilvarErrorBody;
+      detail = errorBody.detail;
+    } catch {
+      // Response body wasn't JSON (or was empty) — fall back to a status-only message.
+    }
+    throw new Error(detail ? `Tilvar API returned ${response.status}: ${detail}` : `Tilvar API returned ${response.status}`);
+  }
+
+  const data = (await response.json()) as TilvarChatResponse;
+  if (!data.reply) {
+    throw new Error("Tilvar API returned no reply content");
+  }
+  return data.reply.trim();
 }
